@@ -1,0 +1,49 @@
+name: Build plugin for Linux
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout plugin repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y cmake build-essential \
+              gettext curl doxygen \
+              libwxgtk3.0-gtk3-dev libwxbase3.0-dev wx3.0-headers \
+              libglu1-mesa-dev libcurl4-openssl-dev libexpat1-dev \
+              libtinyxml-dev
+
+      - name: Clone OpenCPN source (for headers & SDK)
+        run: |
+          git clone https://github.com/OpenCPN/OpenCPN.git ../OpenCPN
+          mkdir -p ../OpenCPN/build
+          cd ../OpenCPN/build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Configure plugin build
+        run: |
+          mkdir build
+          cd build
+          cmake .. \
+            -DOCPN_SOURCE_DIR=$GITHUB_WORKSPACE/../OpenCPN \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build plugin
+        run: |
+          cd build
+          make -j$(nproc)
+
+      - name: Archive .so
+        uses: actions/upload-artifact@v3
+        with:
+          name: testplugin_linux_so
+          path: build/*.so
